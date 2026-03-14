@@ -1,11 +1,89 @@
 import pandas as pd
 import pandas_ta as ta
 import numpy as np
+import yfinance as yf
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from datetime import datetime, timedelta
 import pytz
 from .base import data_client
+
+
+def get_historical_price_series(symbol: str, years: int) -> list[dict]:
+    """Fetch daily historical prices for a symbol over N years."""
+    if years not in (1, 3, 5, 10):
+        raise ValueError("Years must be one of: 1, 3, 5, 10")
+
+    clean_symbol = symbol.strip().upper()
+    if not clean_symbol:
+        raise ValueError("Symbol is required")
+
+    try:
+        history = yf.Ticker(clean_symbol).history(period=f"{years}y", interval="1d")
+    except Exception as exc:
+        raise ValueError(f"Failed to fetch history for {clean_symbol}: {exc}")
+
+    if history is None or history.empty:
+        raise ValueError(f"No historical price data found for {clean_symbol}")
+
+    history = history.reset_index()
+    date_col = "Date" if "Date" in history.columns else history.columns[0]
+
+    points: list[dict] = []
+    for _, row in history.iterrows():
+        date_value = pd.to_datetime(row[date_col]).date().isoformat()
+        close_value = row.get("Close")
+        open_value = row.get("Open")
+        high_value = row.get("High")
+        low_value = row.get("Low")
+        volume_value = row.get("Volume")
+
+        points.append(
+            {
+                "date": date_value,
+                "open": float(open_value) if pd.notna(open_value) else None,
+                "high": float(high_value) if pd.notna(high_value) else None,
+                "low": float(low_value) if pd.notna(low_value) else None,
+                "close": float(close_value) if pd.notna(close_value) else None,
+                "volume": int(volume_value) if pd.notna(volume_value) else None,
+            }
+        )
+
+    return points
+
+
+def _fetch_yahoo_metrics(symbol: str) -> dict:
+    """Fetch stock metrics/financials using yfinance."""
+    try:
+        info = yf.Ticker(symbol).info or {}
+    except Exception:
+        return {}
+
+    out = {}
+    quote_type = info.get("quoteType")
+    out["quote_type"] = quote_type
+    out["is_etf"] = quote_type == "ETF"
+
+    out["pe_ratio"] = info.get("trailingPE")
+    out["forward_pe"] = info.get("forwardPE")
+    out["eps"] = info.get("trailingEps")
+    out["forward_eps"] = info.get("forwardEps")
+    out["peg_ratio"] = info.get("pegRatio")
+    out["beta"] = info.get("beta")
+    out["market_cap"] = info.get("marketCap")
+
+    out["dividend_yield"] = info.get("dividendYield")
+    out["dividend_rate"] = info.get("dividendRate")
+
+    out["sector"] = info.get("sector")
+    out["industry"] = info.get("industry")
+
+    out["debt_to_equity"] = info.get("debtToEquity")
+    out["current_ratio"] = info.get("currentRatio")
+    out["profit_margin"] = info.get("profitMargins")
+
+    return out
+
 
 def get_stock_features(symbol: str, days: int = 365) -> pd.DataFrame:
     """
@@ -24,11 +102,16 @@ def get_stock_features(symbol: str, days: int = 365) -> pd.DataFrame:
     
     bars = data_client.get_stock_bars(request)
     if bars is None or bars.df is None:
-        return pd.DataFrame()
+        raise ValueError("Alpaca returned no bars for the requested symbol/date range. Check API key, plan, or symbol validity.")
     df = bars.df.copy()
     
     if df.empty:
-        return pd.DataFrame()
+        raise ValueError("Alpaca returned an empty price series for this symbol. Try a different symbol or verify your Alpaca data access.")
+
+    # Fetch per-stock metrics (PE, ETF flag, sector, etc.)
+    metrics = _fetch_yahoo_metrics(symbol)
+    for k, v in metrics.items():
+        df[k] = v
     
     # Basic price features
     df['returns'] = df['close'].pct_change()
@@ -105,8 +188,16 @@ def get_stock_features(symbol: str, days: int = 365) -> pd.DataFrame:
     except Exception:
         pass
     
-    # Target: next day's close price (shifted)
-    df['target'] = df['close'].shift(-1)
+    # Target: average close price over the next ~3 months (63 trading days)
+    horizon_days = 63
+    df['target_3m_avg'] = (
+        df['close']
+        .shift(-1)
+        .iloc[::-1]
+        .rolling(window=horizon_days, min_periods=horizon_days)
+        .mean()
+        .iloc[::-1]
+    )
     
     # Note: Not dropping NaN to preserve data for short periods
     return df
