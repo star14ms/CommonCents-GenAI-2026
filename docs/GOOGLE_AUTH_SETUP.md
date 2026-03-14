@@ -36,13 +36,13 @@
 2. Paste **Client ID** and **Client Secret**
 3. Save
 
-## 4. Run Database Migration (chat history)
+## 4. Run Database Migrations (chat)
 
-User info comes from **Authentication → Users** (Supabase Auth). For chat history, run:
+User info comes from **Authentication → Users** (Supabase Auth). For chat with multiple sessions:
 
 **Option A – Supabase SQL Editor:**
-1. Supabase Dashboard → **SQL Editor**
-2. Run `supabase/migrations/20250315000000_create_chat_messages.sql`
+1. Run `supabase/migrations/20250315000000_create_chat_messages.sql`
+2. Run `supabase/migrations/20250316000000_add_chat_sessions.sql`
 
 **Option B – Supabase CLI:**
 ```bash
