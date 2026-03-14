@@ -5,7 +5,7 @@ from alpaca.data.timeframe import TimeFrame
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 import pytz
-from .base import data_client
+from .model import *
 
 router = APIRouter()
 
@@ -18,31 +18,18 @@ def get_stock_analysis(symbol: str, days: int = 30):
         raise HTTPException(status_code=400, detail="Days must be between 1 and 365.")
     
     try:
-        # Use a fixed end date to bypass subscription limits for recent data
-        end_date = datetime(2024, 12, 31, tzinfo=pytz.UTC)
-        start_date = end_date - timedelta(days=days)
-        
-        request = StockBarsRequest(
-            symbol_or_symbols=symbol.upper(),
-            timeframe=TimeFrame.Day,
-            start=start_date,
-            end=end_date
-        )
-        
-        bars = data_client.get_stock_bars(request)
-        df = bars.df
+        df = get_stock_features(symbol, days)
         
         if df.empty:
             return {"error": "No data available for this symbol in the specified period."}
         
-        # Basic analysis: Add moving averages and RSI
-        df['SMA_20'] = ta.sma(df['close'], length=20)
-        df['RSI'] = ta.rsi(df['close'], length=14)
+        # Drop target column as it's for ML, not display
+        df = df.drop(columns=['target'], errors='ignore')
         
-        # Example: Check if RSI > 70 (overbought) or < 30 (oversold)
-        latest_rsi = df['RSI'].iloc[-1]
+        # Use RSI for signal
+        latest_rsi = df['RSI'].iloc[-1] if 'RSI' in df.columns else None
         if pd.isna(latest_rsi):
-            signal = "Insufficient data for RSI calculation"
+            signal = "Insufficient data for analysis"
         elif latest_rsi > 70:
             signal = "Overbought - Consider selling"
         elif latest_rsi < 30:
