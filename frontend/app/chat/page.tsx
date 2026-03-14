@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -22,6 +23,7 @@ interface Tool {
 }
 
 export default function ChatPage() {
+  const { user, profile, signInWithGoogle, signOut } = useAuth();
   const [provider, setProvider] = useState<string>("chatgpt");
   const [providers, setProviders] = useState<Provider[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -170,17 +172,23 @@ export default function ChatPage() {
               </>
             )}
           </select>
-          <a
-            href="/"
-            style={{
-              marginLeft: "auto",
-              fontSize: "0.875rem",
-              color: "#666",
-              textDecoration: "none",
-            }}
-          >
-            ← Back
-          </a>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {user && profile && (
+              <span style={{ fontSize: "0.75rem", color: "#666" }}>
+                {profile.full_name || profile.email}
+              </span>
+            )}
+            <a
+              href="/"
+              style={{
+                fontSize: "0.875rem",
+                color: "#666",
+                textDecoration: "none",
+              }}
+            >
+              ← Back
+            </a>
+          </div>
         </div>
         {tools.length > 0 && (
           <div style={{ marginTop: "0.5rem" }}>
