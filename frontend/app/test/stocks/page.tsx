@@ -11,7 +11,7 @@ type HistoryPoint = {
 
 const RANGES = [1, 3, 5, 10] as const;
 
-export default function StocksPage() {
+export default function TestStocksPage() {
   const [symbol, setSymbol] = useState("AAPL");
   const [years, setYears] = useState<(typeof RANGES)[number]>(1);
   const [points, setPoints] = useState<HistoryPoint[]>([]);
@@ -97,7 +97,7 @@ export default function StocksPage() {
         <p style={{ color: "#555", marginBottom: "0.75rem" }}>
           Visualize historical close price for 1, 3, 5, or 10 years.
         </p>
-        <a href="/" style={{ color: "#666", textDecoration: "none" }}>
+        <a href="/test" style={{ color: "#666", textDecoration: "none" }}>
           ← Back
         </a>
       </header>

@@ -31,7 +31,7 @@ interface Tool {
   description: string;
 }
 
-export default function ChatPage() {
+export default function TestChatPage() {
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -323,7 +323,7 @@ export default function ChatPage() {
           Sign in with Google
         </button>
         <Link
-          href="/"
+          href="/test"
           style={{
             marginTop: "1rem",
             fontSize: "0.875rem",
@@ -331,7 +331,7 @@ export default function ChatPage() {
             textDecoration: "none",
           }}
         >
-          ← Back to Home
+          ← Back to Test
         </Link>
       </main>
     );
@@ -488,7 +488,7 @@ export default function ChatPage() {
                 </span>
               )}
               <a
-                href="/"
+                href="/test"
                 style={{
                   fontSize: "0.875rem",
                   color: "#666",
