@@ -61,8 +61,13 @@ def chat_providers():
 
 @app.get("/api/chat/tools")
 def get_tools():
-    """List available tools (web_search, code_interpreter). Only ChatGPT supports these."""
-    return {"tools": AVAILABLE_TOOLS}
+    """List available tools. Only ChatGPT supports these. See https://developers.openai.com/api/docs/guides/tools/"""
+    return {
+        "tools": [
+            {"id": t["id"], "name": t["name"], "description": t["description"]}
+            for t in AVAILABLE_TOOLS
+        ]
+    }
 
 
 @app.get("/api/chat/system-prompt")

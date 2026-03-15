@@ -499,10 +499,10 @@ export default function ChatPage() {
               </a>
             </div>
           </div>
-          {tools.length > 0 && (
+          {tools.length > 0 && provider === "chatgpt" && (
             <div style={{ marginTop: "0.5rem" }}>
               <span style={{ fontSize: "0.875rem", color: "#666", display: "block", marginBottom: "0.25rem" }}>
-                Tools (ChatGPT only):
+                Tools:
               </span>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem 1rem" }}>
                 {tools.map((t) => (
@@ -521,12 +521,25 @@ export default function ChatPage() {
                       type="checkbox"
                       checked={selectedTools.has(t.id)}
                       onChange={() => toggleTool(t.id)}
-                      disabled={loading || provider !== "chatgpt"}
+                      disabled={loading}
                     />
                     {t.name}
                   </label>
                 ))}
               </div>
+              <a
+                href="https://developers.openai.com/api/docs/guides/tools/"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#6b7280",
+                  marginTop: "0.25rem",
+                  display: "inline-block",
+                }}
+              >
+                All options: OpenAI tools documentation →
+              </a>
             </div>
           )}
           <div style={{ marginTop: "0.5rem" }}>
