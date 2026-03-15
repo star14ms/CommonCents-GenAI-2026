@@ -335,24 +335,31 @@ def generate_qualitative_summary(
         profile.get("company_name") or clean_symbol,
         limit=news_limit,
     )
+    df = get_stock_features(clean_symbol, 252)
+    quant_snapshot = _build_quant_snapshot(df)
 
     news_payload = {
         "symbol": clean_symbol,
         "profile": profile,
         "headlines": headlines,
+        "quant_snapshot": quant_snapshot,
     }
 
     news_prompt = (
-        "You are a beginner-friendly market news explainer. "
-        "Use only the provided profile and headlines. "
-        "Do not include technical indicators or model predictions.\n\n"
-        "Write 5 short bullet points in simple language:\n"
-        "1) Big picture takeaway (1 line)\n"
-        "2) Key news/events (2-3 items)\n"
-        "3) Why this matters for the stock\n"
-        "4) Main risks (macro/geopolitics/oil/rates)\n"
-        "5) What to watch next (week/month)\n\n"
-        "Rules: max 150 words, avoid jargon (or explain it in a few words), if data is missing say 'data unavailable', end with 'Not financial advice.'\n\n"
+        "You are a beginner-friendly stock explainer. Use only the provided JSON context.\n\n"
+        "Create a short debate between 3 characters with different risk tolerance:\n"
+        "- HighRisk: aggressive, growth-focused\n"
+        "- MediumRisk: balanced\n"
+        "- LowRisk: defensive, capital-preservation focused\n\n"
+        "Each character should give 2 short bullets based on BOTH news/macro context and quantitative signals.\n"
+        "Then provide a FINAL QUALITATIVE SUMMARY for beginners.\n\n"
+        "Output format (exact sections):\n"
+        "1) Debate (HighRisk / MediumRisk / LowRisk)\n"
+        "2) Final Qualitative Summary\n"
+        "   - Big picture\n"
+        "   - Main current-event risks\n"
+        "   - What to watch next\n\n"
+        "Rules: <=220 words total, simple language, explain jargon in 3-6 words, if data missing say 'data unavailable', end with 'Not financial advice.'\n\n"
         f"Context JSON:\n{json.dumps(news_payload, default=str, indent=2)}"
     )
 
@@ -363,6 +370,7 @@ def generate_qualitative_summary(
         "qualitative_summary": qualitative_summary,
         "profile": profile,
         "headlines": headlines,
+        "quant_snapshot": quant_snapshot,
     }
 
 
@@ -379,24 +387,35 @@ def generate_quantitative_summary(
     df = get_stock_features(clean_symbol, days)
     profile = _fetch_company_profile(clean_symbol)
     quant_snapshot = _build_quant_snapshot(df)
+    headlines = _collect_market_news(
+        clean_symbol,
+        profile.get("company_name") or clean_symbol,
+        limit=8,
+    )
 
     quant_payload = {
         "symbol": clean_symbol,
         "profile": profile,
         "quant_snapshot": quant_snapshot,
+        "headlines": headlines,
     }
 
     quant_prompt = (
-        "You are a beginner-friendly quantitative stock explainer. "
-        "Use only the provided profile and quant_snapshot. "
-        "Do not discuss news in this section.\n\n"
-        "Write 5 short bullet points in simple language:\n"
-        "1) Data takeaway (1 line)\n"
-        "2) Recent performance (1M and 3M returns)\n"
-        "3) Key indicators in plain words (trend/momentum/volatility)\n"
-        "4) 3-month average prediction and what it implies vs latest price\n"
-        "5) Data-based risks/limitations\n\n"
-        "Rules: max 150 words, avoid jargon (or explain it), if a metric is missing say 'data unavailable', end with 'Not financial advice.'\n\n"
+        "You are a beginner-friendly stock explainer. Use only the provided JSON context.\n\n"
+        "Create a short debate between 3 characters with different risk tolerance:\n"
+        "- HighRisk: aggressive, growth-focused\n"
+        "- MediumRisk: balanced\n"
+        "- LowRisk: defensive, capital-preservation focused\n\n"
+        "Each character should give 2 short bullets based on BOTH quantitative signals and current-event/news context.\n"
+        "Then provide a FINAL QUANTITATIVE SUMMARY for beginners.\n\n"
+        "Output format (exact sections):\n"
+        "1) Debate (HighRisk / MediumRisk / LowRisk)\n"
+        "2) Final Quantitative Summary\n"
+        "   - Data takeaway\n"
+        "   - 1M/3M performance\n"
+        "   - 3-month average prediction interpretation\n"
+        "   - Data-based risks\n\n"
+        "Rules: <=220 words total, simple language, explain jargon in 3-6 words, if data missing say 'data unavailable', end with 'Not financial advice.'\n\n"
         f"Context JSON:\n{json.dumps(quant_payload, default=str, indent=2)}"
     )
 
@@ -407,4 +426,5 @@ def generate_quantitative_summary(
         "quantitative_summary": quantitative_summary,
         "profile": profile,
         "quant_snapshot": quant_snapshot,
+        "headlines": headlines,
     }
