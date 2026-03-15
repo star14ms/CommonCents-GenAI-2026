@@ -1,12 +1,7 @@
 import json
 import pandas as pd
-import pandas_ta as ta
-from alpaca.data.requests import StockBarsRequest
-from alpaca.data.timeframe import TimeFrame
-from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-import pytz
 from .agent import (
     generate_qualitative_summary,
     generate_qualitative_summary_stream,
@@ -47,6 +42,7 @@ def get_qualitative_summary(
     symbol: str,
     provider: str = "chatgpt",
     news_limit: int = 8,
+    mode: str = "beginner",
 ):
     clean_symbol = symbol.strip().upper()
     if not clean_symbol or not clean_symbol.isalpha() or len(clean_symbol) > 5:
@@ -60,6 +56,7 @@ def get_qualitative_summary(
             clean_symbol,
             provider_id=provider,
             news_limit=news_limit,
+            mode=mode,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -74,6 +71,7 @@ def stream_qualitative_summary(
     symbol: str,
     provider: str = "chatgpt",
     news_limit: int = 8,
+    mode: str = "beginner",
 ):
     """Stream qualitative summary as plain text chunks."""
     clean_symbol = symbol.strip().upper()
@@ -88,6 +86,7 @@ def stream_qualitative_summary(
             clean_symbol,
             provider_id=provider,
             news_limit=news_limit,
+            mode=mode,
         )
         first = next(stream, None)
         if first is not None and isinstance(first, dict) and "_meta" in first:
@@ -110,6 +109,7 @@ def get_quantitative_summary(
     symbol: str,
     provider: str = "chatgpt",
     days: int = 252,
+    mode: str = "beginner",
 ):
     clean_symbol = symbol.strip().upper()
     if not clean_symbol or not clean_symbol.isalpha() or len(clean_symbol) > 5:
@@ -123,6 +123,7 @@ def get_quantitative_summary(
             clean_symbol,
             provider_id=provider,
             days=days,
+            mode=mode,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -137,6 +138,7 @@ def stream_quantitative_summary(
     symbol: str,
     provider: str = "chatgpt",
     days: int = 252,
+    mode: str = "beginner",
 ):
     """Stream quantitative summary as plain text chunks."""
     clean_symbol = symbol.strip().upper()
@@ -151,6 +153,7 @@ def stream_quantitative_summary(
             clean_symbol,
             provider_id=provider,
             days=days,
+            mode=mode,
         ):
             yield chunk.encode("utf-8")
 

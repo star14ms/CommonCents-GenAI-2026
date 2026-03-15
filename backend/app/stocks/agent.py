@@ -238,91 +238,101 @@ def _build_quant_snapshot(df: pd.DataFrame) -> dict:
     }
 
 
-def generate_stock_agentic_summary(
-    symbol: str,
-    provider_id: str = "gemini",
-    days: int = 252,
-    news_limit: int = 8,
-) -> dict:
-    clean_symbol = symbol.strip().upper()
-    provider = get_provider(provider_id)
-    if not provider:
-        raise ValueError("Unknown provider. Available: gemini, claude, chatgpt")
+def _normalize_mode(mode: str) -> str:
+    return "expert" if str(mode).strip().lower() == "expert" else "beginner"
 
-    df = get_stock_features(clean_symbol, days)
-    profile = _fetch_company_profile(clean_symbol)
-    headlines = _collect_market_news(
-        clean_symbol,
-        profile.get("company_name") or clean_symbol,
-        limit=news_limit,
-    )
-    quant_snapshot = _build_quant_snapshot(df)
 
-    news_payload = {
-        "symbol": clean_symbol,
-        "profile": profile,
-        "headlines": headlines,
-    }
+def _build_qualitative_prompt(payload: dict, mode: str) -> str:
+    normalized_mode = _normalize_mode(mode)
+    if normalized_mode == "expert":
+        return (
+            "You are a stock strategist writing for advanced users. Use only the provided JSON context.\n\n"
+            "Create a concise debate between 3 risk personas:\n"
+            "- HighRisk (aggressive growth)\n"
+            "- MediumRisk (balanced)\n"
+            "- LowRisk (capital preservation)\n\n"
+            "Each persona gives 2 specific bullets grounded in BOTH news/macro context and quantitative signals.\n"
+            "Then provide a FINAL QUALITATIVE SUMMARY with:\n"
+            "- News & macro regime\n"
+            "- Cross-asset/geopolitics implications\n"
+            "- Event risks and catalysts\n"
+            "- Near-term watchlist\n\n"
+            "Rules: keep it tight (<=260 words), use precise language, do not invent facts, if data missing say 'data unavailable', end with 'Not financial advice.'\n\n"
+            f"Context JSON:\n{json.dumps(payload, default=str, indent=2)}"
+        )
 
-    news_prompt = (
-        "You are a beginner-friendly market news explainer. "
-        "Use only the provided profile and headlines. "
-        "Do not include technical indicators or model predictions.\n\n"
-        "Write 5 short bullet points in simple language:\n"
-        "1) Big picture takeaway (1 line)\n"
-        "2) Key news/events (2-3 items)\n"
-        "3) Why this matters for the stock\n"
-        "4) Main risks (macro/geopolitics/oil/rates)\n"
-        "5) What to watch next (week/month)\n\n"
-        "Rules: max 150 words, avoid jargon (or explain it in a few words), if data is missing say 'data unavailable', end with 'Not financial advice.'\n\n"
-        f"Context JSON:\n{json.dumps(news_payload, default=str, indent=2)}"
-    )
-
-    quant_payload = {
-        "symbol": clean_symbol,
-        "profile": profile,
-        "quant_snapshot": quant_snapshot,
-    }
-
-    quant_prompt = (
-        "You are a beginner-friendly quantitative stock explainer. "
-        "Use only the provided profile and quant_snapshot. "
-        "Do not discuss news in this section.\n\n"
-        "Write 5 short bullet points in simple language:\n"
-        "1) Data takeaway (1 line)\n"
-        "2) Recent performance (1M and 3M returns)\n"
-        "3) Key indicators in plain words (trend/momentum/volatility)\n"
-        "4) 3-month average prediction and what it implies vs latest price\n"
-        "5) Data-based risks/limitations\n\n"
-        "Rules: max 150 words, avoid jargon (or explain it), if a metric is missing say 'data unavailable', end with 'Not financial advice.'\n\n"
-        f"Context JSON:\n{json.dumps(quant_payload, default=str, indent=2)}"
+    return (
+        "You are explaining the stock update to someone with zero finance or technical background. Use only the JSON context.\n\n"
+        "Write in calm, everyday language for a first-time reader.\n"
+        "Create a short debate between 3 voices:\n"
+        "- HighRisk (more comfortable with bigger ups and downs)\n"
+        "- MediumRisk (balanced)\n"
+        "- LowRisk (more focused on stability)\n\n"
+        "Each voice gives exactly 2 short bullet points.\n"
+        "After the debate, write FINAL QUALITATIVE SUMMARY with exactly 3 bullets:\n"
+        "- What is happening now\n"
+        "- Why this could be risky\n"
+        "- What to watch next\n\n"
+        "Hard rules:\n"
+        "- Do NOT use technical terms, formulas, theorems, indicator names, or stock metric names.\n"
+        "- Do NOT mention terms such as RSI, MACD, beta, PE, ATR, volatility, market cap, earnings per share, moving average, momentum, or valuation.\n"
+        "- Keep sentences short and clear.\n"
+        "- Keep total length <=190 words.\n"
+        "- If data is missing, say 'data unavailable'.\n"
+        "- End with 'Not financial advice.'\n"
+        "- Keep the output neat with clear section titles and bullet points.\n\n"
+        f"Context JSON:\n{json.dumps(payload, default=str, indent=2)}"
     )
 
-    news_summary = provider.chat([ChatMessage(role="user", content=news_prompt)])
-    data_prediction_summary = provider.chat([ChatMessage(role="user", content=quant_prompt)])
 
-    summary = (
-        "## News & Macro Summary\n"
-        f"{news_summary}\n\n"
-        "## Data & Prediction Summary\n"
-        f"{data_prediction_summary}"
+def _build_quantitative_prompt(payload: dict, mode: str) -> str:
+    normalized_mode = _normalize_mode(mode)
+    if normalized_mode == "expert":
+        return (
+            "You are a quantitative stock strategist writing for advanced users. Use only the provided JSON context.\n\n"
+            "Create a concise debate between 3 risk personas:\n"
+            "- HighRisk (aggressive growth)\n"
+            "- MediumRisk (balanced)\n"
+            "- LowRisk (capital preservation)\n\n"
+            "Each persona gives 2 specific bullets grounded in BOTH quant_snapshot and current-event context.\n"
+            "Then provide FINAL QUANTITATIVE SUMMARY with:\n"
+            "- Return profile (1M/3M)\n"
+            "- Signal state (trend/momentum/risk)\n"
+            "- 3-month average prediction interpretation\n"
+            "- Data-driven risks and assumptions\n\n"
+            "Rules: <=260 words, use precise language, do not invent facts, if data missing say 'data unavailable', end with 'Not financial advice.'\n\n"
+            f"Context JSON:\n{json.dumps(payload, default=str, indent=2)}"
+        )
+
+    return (
+        "You are explaining the stock numbers to someone with zero finance or technical background. Use only the JSON context.\n\n"
+        "Write in calm, everyday language for a first-time reader.\n"
+        "Create a short debate between 3 voices:\n"
+        "- HighRisk (more comfortable with bigger ups and downs)\n"
+        "- MediumRisk (balanced)\n"
+        "- LowRisk (more focused on stability)\n\n"
+        "Each voice gives exactly 2 short bullet points.\n"
+        "After the debate, write FINAL QUANTITATIVE SUMMARY with exactly 3 bullets:\n"
+        "- Is the stock generally rising or falling lately (plain words)\n"
+        "- What the 3-month estimate means (plain words)\n"
+        "- Main risk to pay attention to\n\n"
+        "Hard rules:\n"
+        "- Do NOT use technical terms, formulas, theorems, indicator names, or stock metric names.\n"
+        "- Do NOT mention terms such as RSI, MACD, beta, PE, ATR, volatility, market cap, earnings per share, moving average, momentum, or valuation.\n"
+        "- Keep sentences short and clear.\n"
+        "- Keep total length <=190 words.\n"
+        "- If data is missing, say 'data unavailable'.\n"
+        "- End with 'Not financial advice.'\n"
+        "- Keep the output neat with clear section titles and bullet points.\n\n"
+        f"Context JSON:\n{json.dumps(payload, default=str, indent=2)}"
     )
-    return {
-        "symbol": clean_symbol,
-        "provider": provider.id,
-        "summary": summary,
-        "news_summary": news_summary,
-        "data_prediction_summary": data_prediction_summary,
-        "profile": profile,
-        "quant_snapshot": quant_snapshot,
-        "headlines": headlines,
-    }
 
 
 def generate_qualitative_summary(
     symbol: str,
     provider_id: str = "chatgpt",
     news_limit: int = 8,
+    mode: str = "beginner",
 ) -> dict:
     clean_symbol = symbol.strip().upper()
     provider = get_provider(provider_id)
@@ -345,28 +355,13 @@ def generate_qualitative_summary(
         "quant_snapshot": quant_snapshot,
     }
 
-    news_prompt = (
-        "You are a beginner-friendly stock explainer. Use only the provided JSON context.\n\n"
-        "Create a short debate between 3 characters with different risk tolerance:\n"
-        "- HighRisk: aggressive, growth-focused\n"
-        "- MediumRisk: balanced\n"
-        "- LowRisk: defensive, capital-preservation focused\n\n"
-        "Each character should give 2 short bullets based on BOTH news/macro context and quantitative signals.\n"
-        "Then provide a FINAL QUALITATIVE SUMMARY for beginners.\n\n"
-        "Output format (exact sections):\n"
-        "1) Debate (HighRisk / MediumRisk / LowRisk)\n"
-        "2) Final Qualitative Summary\n"
-        "   - Big picture\n"
-        "   - Main current-event risks\n"
-        "   - What to watch next\n\n"
-        "Rules: <=220 words total, simple language, explain jargon in 3-6 words, if data missing say 'data unavailable', end with 'Not financial advice.'\n\n"
-        f"Context JSON:\n{json.dumps(news_payload, default=str, indent=2)}"
-    )
+    news_prompt = _build_qualitative_prompt(news_payload, mode)
 
     qualitative_summary = provider.chat([ChatMessage(role="user", content=news_prompt)])
     return {
         "symbol": clean_symbol,
         "provider": provider.id,
+        "mode": _normalize_mode(mode),
         "qualitative_summary": qualitative_summary,
         "profile": profile,
         "headlines": headlines,
@@ -378,6 +373,7 @@ def generate_qualitative_summary_stream(
     symbol: str,
     provider_id: str = "chatgpt",
     news_limit: int = 8,
+    mode: str = "beginner",
 ):
     """Stream qualitative summary. First yields a metadata dict (for headlines), then text chunks."""
     clean_symbol = symbol.strip().upper()
@@ -401,23 +397,7 @@ def generate_qualitative_summary_stream(
         "quant_snapshot": quant_snapshot,
     }
 
-    news_prompt = (
-        "You are a beginner-friendly stock explainer. Use only the provided JSON context.\n\n"
-        "Create a short debate between 3 characters with different risk tolerance:\n"
-        "- HighRisk: aggressive, growth-focused\n"
-        "- MediumRisk: balanced\n"
-        "- LowRisk: defensive, capital-preservation focused\n\n"
-        "Each character should give 2 short bullets based on BOTH news/macro context and quantitative signals.\n"
-        "Then provide a FINAL QUALITATIVE SUMMARY for beginners.\n\n"
-        "Output format (exact sections):\n"
-        "1) Debate (HighRisk / MediumRisk / LowRisk)\n"
-        "2) Final Qualitative Summary\n"
-        "   - Big picture\n"
-        "   - Main current-event risks\n"
-        "   - What to watch next\n\n"
-        "Rules: <=220 words total, simple language, explain jargon in 3-6 words, if data missing say 'data unavailable', end with 'Not financial advice.'\n\n"
-        f"Context JSON:\n{json.dumps(news_payload, default=str, indent=2)}"
-    )
+    news_prompt = _build_qualitative_prompt(news_payload, mode)
 
     # First yield metadata (headlines) for the frontend
     yield {"_meta": {"headlines": headlines}}
@@ -433,6 +413,7 @@ def generate_quantitative_summary(
     symbol: str,
     provider_id: str = "chatgpt",
     days: int = 252,
+    mode: str = "beginner",
 ) -> dict:
     clean_symbol = symbol.strip().upper()
     provider = get_provider(provider_id)
@@ -455,29 +436,13 @@ def generate_quantitative_summary(
         "headlines": headlines,
     }
 
-    quant_prompt = (
-        "You are a beginner-friendly stock explainer. Use only the provided JSON context.\n\n"
-        "Create a short debate between 3 characters with different risk tolerance:\n"
-        "- HighRisk: aggressive, growth-focused\n"
-        "- MediumRisk: balanced\n"
-        "- LowRisk: defensive, capital-preservation focused\n\n"
-        "Each character should give 2 short bullets based on BOTH quantitative signals and current-event/news context.\n"
-        "Then provide a FINAL QUANTITATIVE SUMMARY for beginners.\n\n"
-        "Output format (exact sections):\n"
-        "1) Debate (HighRisk / MediumRisk / LowRisk)\n"
-        "2) Final Quantitative Summary\n"
-        "   - Data takeaway\n"
-        "   - 1M/3M performance\n"
-        "   - 3-month average prediction interpretation\n"
-        "   - Data-based risks\n\n"
-        "Rules: <=220 words total, simple language, explain jargon in 3-6 words, if data missing say 'data unavailable', end with 'Not financial advice.'\n\n"
-        f"Context JSON:\n{json.dumps(quant_payload, default=str, indent=2)}"
-    )
+    quant_prompt = _build_quantitative_prompt(quant_payload, mode)
 
     quantitative_summary = provider.chat([ChatMessage(role="user", content=quant_prompt)])
     return {
         "symbol": clean_symbol,
         "provider": provider.id,
+        "mode": _normalize_mode(mode),
         "quantitative_summary": quantitative_summary,
         "profile": profile,
         "quant_snapshot": quant_snapshot,
@@ -489,6 +454,7 @@ def generate_quantitative_summary_stream(
     symbol: str,
     provider_id: str = "chatgpt",
     days: int = 252,
+    mode: str = "beginner",
 ):
     """Stream quantitative summary token by token. Yields text chunks."""
     clean_symbol = symbol.strip().upper()
@@ -512,24 +478,7 @@ def generate_quantitative_summary_stream(
         "headlines": headlines,
     }
 
-    quant_prompt = (
-        "You are a beginner-friendly stock explainer. Use only the provided JSON context.\n\n"
-        "Create a short debate between 3 characters with different risk tolerance:\n"
-        "- HighRisk: aggressive, growth-focused\n"
-        "- MediumRisk: balanced\n"
-        "- LowRisk: defensive, capital-preservation focused\n\n"
-        "Each character should give 2 short bullets based on BOTH quantitative signals and current-event/news context.\n"
-        "Then provide a FINAL QUANTITATIVE SUMMARY for beginners.\n\n"
-        "Output format (exact sections):\n"
-        "1) Debate (HighRisk / MediumRisk / LowRisk)\n"
-        "2) Final Quantitative Summary\n"
-        "   - Data takeaway\n"
-        "   - 1M/3M performance\n"
-        "   - 3-month average prediction interpretation\n"
-        "   - Data-based risks\n\n"
-        "Rules: <=220 words total, simple language, explain jargon in 3-6 words, if data missing say 'data unavailable', end with 'Not financial advice.'\n\n"
-        f"Context JSON:\n{json.dumps(quant_payload, default=str, indent=2)}"
-    )
+    quant_prompt = _build_quantitative_prompt(quant_payload, mode)
 
     if hasattr(provider, "chat_stream"):
         yield from provider.chat_stream([ChatMessage(role="user", content=quant_prompt)])
