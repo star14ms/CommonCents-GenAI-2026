@@ -6,6 +6,7 @@ import { searchStocks } from "@/lib/stocks";
 
 export default function Home() {
   const [query, setQuery] = useState("");
+  const [mode, setMode] = useState<"beginner" | "expert">("beginner");
   const [suggestions, setSuggestions] = useState<{ symbol: string; name: string }[]>([]);
   const [highlighted, setHighlighted] = useState(-1);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -30,7 +31,7 @@ export default function Home() {
   }, []);
 
   const navigateToStock = (symbol: string) => {
-    router.push(`/search/${encodeURIComponent(symbol)}`);
+    router.push(`/search/${encodeURIComponent(symbol)}?mode=${mode}`);
     setQuery("");
     setShowDropdown(false);
   };
@@ -47,7 +48,7 @@ export default function Home() {
     } else if (suggestions.length > 0) {
       navigateToStock(suggestions[0].symbol);
     } else {
-      router.push(`/search/${encodeURIComponent(q.toUpperCase())}`);
+      router.push(`/search/${encodeURIComponent(q.toUpperCase())}?mode=${mode}`);
       setQuery("");
     }
   };
@@ -182,6 +183,48 @@ export default function Home() {
                 </ul>
               )}
             </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                justifyContent: "center",
+              }}
+            >
+              <span style={{ fontSize: "0.875rem", color: "#475569" }}>Mode:</span>
+              <button
+                type="button"
+                onClick={() => setMode("beginner")}
+                style={{
+                  padding: "0.375rem 0.75rem",
+                  borderRadius: "999px",
+                  border: "1px solid #cbd5e1",
+                  background: mode === "beginner" ? "#2563eb" : "#fff",
+                  color: mode === "beginner" ? "#fff" : "#334155",
+                  fontSize: "0.8125rem",
+                  cursor: "pointer",
+                }}
+              >
+                Beginner
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("expert")}
+                style={{
+                  padding: "0.375rem 0.75rem",
+                  borderRadius: "999px",
+                  border: "1px solid #cbd5e1",
+                  background: mode === "expert" ? "#2563eb" : "#fff",
+                  color: mode === "expert" ? "#fff" : "#334155",
+                  fontSize: "0.8125rem",
+                  cursor: "pointer",
+                }}
+              >
+                Expert
+              </button>
+            </div>
+
             <button
               type="submit"
               disabled={!query.trim()}

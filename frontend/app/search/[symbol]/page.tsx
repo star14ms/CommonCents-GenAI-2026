@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import StockChart, { RANGES } from "@/components/StockChart";
@@ -34,7 +34,9 @@ type PointsByRange = Partial<Record<(typeof RANGES)[number], HistoryPoint[]>>;
 
 export default function SearchPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const symbol = (params?.symbol as string)?.toUpperCase() || "";
+  const mode = (searchParams?.get("mode") || "beginner").toLowerCase() === "expert" ? "expert" : "beginner";
   const [years, setYears] = useState<(typeof RANGES)[number]>(1);
   const [pointsByRange, setPointsByRange] = useState<PointsByRange>({});
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
@@ -118,7 +120,7 @@ export default function SearchPage() {
     const loadQualitativeStream = async () => {
       try {
         const res = await fetch(
-          `${base}/api/stocks/qualitative-summary/${encodeURIComponent(symbol)}/stream?news_limit=5`,
+          `${base}/api/stocks/qualitative-summary/${encodeURIComponent(symbol)}/stream?news_limit=5&mode=${mode}`,
           { signal: qualAbort.signal }
         );
         if (qualCancelled) return;
@@ -190,7 +192,7 @@ export default function SearchPage() {
     const loadQuantitativeStream = async () => {
       try {
         const res = await fetch(
-          `${base}/api/stocks/quantitative-summary/${encodeURIComponent(symbol)}/stream?days=252`,
+          `${base}/api/stocks/quantitative-summary/${encodeURIComponent(symbol)}/stream?days=252&mode=${mode}`,
           { signal: quantAbort.signal }
         );
         if (quantCancelled) return;
@@ -237,7 +239,7 @@ export default function SearchPage() {
       qualAbort.abort();
       quantAbort.abort();
     };
-  }, [symbol, base]);
+  }, [symbol, base, mode]);
 
   const handleRangeChange = (range: (typeof RANGES)[number]) => {
     setYears(range);
@@ -279,6 +281,9 @@ export default function SearchPage() {
         <h1 style={{ fontSize: "1.75rem", marginBottom: "0.25rem" }}>
           {companyName ? `${companyName} (${symbol})` : symbol}
         </h1>
+        <p style={{ fontSize: "0.875rem", color: "#64748b", marginBottom: "0.25rem" }}>
+          Summary mode: {mode === "expert" ? "Expert" : "Beginner"}
+        </p>
         {analysis?.latest_price != null && (
           <p style={{ fontSize: "1.25rem", color: "#334155", fontWeight: 600 }}>
             ${analysis.latest_price.toFixed(2)}
