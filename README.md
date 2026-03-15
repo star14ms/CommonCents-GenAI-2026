@@ -10,6 +10,36 @@ A full-stack stock research and analysis app with Next.js (Vercel) and FastAPI (
 └── README.md
 ```
 
+## Tech Stack
+
+### Frontend
+| Category | Library | Purpose |
+|----------|---------|---------|
+| Framework | Next.js 14 | React framework, routing, SSR |
+| UI | React 18 | Components |
+| Auth/DB | Supabase | Authentication, database |
+| Content | react-markdown, rehype-raw | Markdown rendering |
+| Language | TypeScript | Typing |
+
+### Backend
+| Category | Library | Purpose |
+|----------|---------|---------|
+| Framework | FastAPI | REST API |
+| Serverless | Mangum | FastAPI → AWS Lambda adapter |
+| Server | Uvicorn | ASGI server (local dev) |
+| Config | python-dotenv, Pydantic | Env loading, validation |
+
+**LLM providers:** google-genai (Gemini), anthropic (Claude), openai (ChatGPT / HuggingFace)
+
+**Stocks:** alpaca-py, pandas, pandas-ta, yfinance, numpy, pytz
+
+### Deployment
+| Tool | Purpose |
+|------|---------|
+| AWS SAM | Deploy backend to Lambda |
+| Docker | Container image for Lambda |
+| Vercel | Host frontend |
+
 ## Prerequisites
 
 - Node.js 18+
