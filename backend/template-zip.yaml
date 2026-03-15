@@ -1,10 +1,12 @@
+# Zip deployment - no Docker required. Chat only (stocks excluded, 250 MB limit).
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Minimum web service backend - FastAPI on Lambda
+Description: FastAPI on Lambda (zip package)
 
 Globals:
   Function:
     Timeout: 30
+    Runtime: python3.12
     MemorySize: 512
 
 Resources:
@@ -24,11 +26,8 @@ Resources:
   WebServiceFunction:
     Type: AWS::Serverless::Function
     Properties:
-      PackageType: Image
-      ImageUri: web-service:latest
-      Environment:
-        Variables:
-          NUMBA_CACHE_DIR: /tmp
+      Handler: app.main.lambda_handler
+      CodeUri: .
       Events:
         ApiEvent:
           Type: HttpApi
@@ -42,9 +41,6 @@ Resources:
             ApiId: !Ref WebServiceApi
             Path: /
             Method: ANY
-    Metadata:
-      Dockerfile: Dockerfile
-      DockerContext: .
 
 Outputs:
   ApiUrl:

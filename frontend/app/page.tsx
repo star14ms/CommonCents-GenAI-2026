@@ -37,8 +37,14 @@ export default function Home() {
 
     const apiPromise = hasApi
       ? Promise.all([
-        fetch(`${base}/health`).then((r) => r.json()),
-        fetch(`${base}/api/hello`).then((r) => r.json()),
+        fetch(`${base}/health`).then(async (r) => {
+          if (!r.ok) throw new Error(`API ${r.status} at ${base}/health — check NEXT_PUBLIC_API_URL (no /Prod stage)`);
+          return r.json();
+        }),
+        fetch(`${base}/api/hello`).then(async (r) => {
+          if (!r.ok) throw new Error(`API ${r.status} at ${base}/api/hello — check NEXT_PUBLIC_API_URL`);
+          return r.json();
+        }),
       ]).then(([health, hello]) => ({ health, hello }))
       : Promise.resolve({ health: null, hello: null });
 
@@ -89,6 +95,11 @@ export default function Home() {
             : itemsResult.reason?.message || "Failed to fetch items"
           : null;
 
+      const apiError =
+        apiResult.status === "rejected"
+          ? apiResult.reason?.message || "API request failed"
+          : null;
+
       setState({
         health,
         hello,
@@ -96,7 +107,7 @@ export default function Home() {
         helloUrl: hasApi ? `${base}/api/hello` : null,
         items,
         itemsError,
-        error: hasApi ? null : "NEXT_PUBLIC_API_URL is not set",
+        error: hasApi ? apiError : "NEXT_PUBLIC_API_URL is not set",
       });
     });
   }, []);
@@ -204,7 +215,16 @@ export default function Home() {
       </p>
 
       {state.error && (
-        <p style={{ color: "#c00", marginBottom: "1rem" }}>{state.error}</p>
+        <div style={{ color: "#c00", marginBottom: "1rem", padding: "0.75rem", background: "#fee2e2", borderRadius: "8px" }}>
+          <p style={{ margin: 0 }}>{state.error}</p>
+          {state.error.includes("NEXT_PUBLIC_API_URL") && (
+            <p style={{ margin: "0.5rem 0 0", fontSize: "0.875rem" }}>
+              Vercel: Project → Settings → Environment Variables → add{" "}
+              <code>NEXT_PUBLIC_API_URL</code> ={" "}
+              <code>https://28gra3tzo6.execute-api.ca-central-1.amazonaws.com</code>
+            </p>
+          )}
+        </div>
       )}
 
       <section style={{ marginBottom: "1.5rem" }}>

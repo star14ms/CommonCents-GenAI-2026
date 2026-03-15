@@ -43,8 +43,18 @@ export default function StocksPage() {
       const res = await fetch(
         `${base}/api/stocks/history/${encodeURIComponent(cleanSymbol)}?years=${nextYears}`
       );
-      const data = await res.json();
+      let data: { detail?: string; points?: HistoryPoint[] } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
       if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error(
+            "Stocks API is not available in the deployed backend. Run the backend locally with full dependencies (pip install -r requirements-full.txt) for stocks support."
+          );
+        }
         throw new Error(data.detail || "Failed to load stock history");
       }
 

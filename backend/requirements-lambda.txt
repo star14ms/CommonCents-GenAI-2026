@@ -1,0 +1,8 @@
+# Minimal deps for Lambda (chat API only). Keeps package under 250 MB.
+# For local dev with stocks: pip install -r requirements.txt
+fastapi
+mangum
+python-dotenv
+google-genai
+anthropic
+openai

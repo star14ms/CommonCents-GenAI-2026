@@ -90,6 +90,11 @@ def get_stock_features(symbol: str, days: int = 365) -> pd.DataFrame:
     Fetch stock data and calculate features for ML model to predict price.
     Returns DataFrame with OHLCV, technical indicators, and target (next day's close).
     """
+    if data_client is None:
+        raise ValueError(
+            "ALPACA_API_KEY and ALPACA_SECRET_KEY must be set in environment. "
+            "Configure them in Lambda environment variables or .env for local development."
+        )
     end_date = datetime(2024, 12, 31, tzinfo=pytz.UTC)
     start_date = end_date - timedelta(days=days)
     

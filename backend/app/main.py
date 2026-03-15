@@ -1,3 +1,4 @@
+import json
 import os
 
 from fastapi import FastAPI, HTTPException
@@ -10,6 +11,12 @@ from app.llm.prompts import DEFAULT_SYSTEM_PROMPT
 from app.llm.tools import AVAILABLE_TOOLS
 
 app = FastAPI(title="Web Service API")
+
+try:
+    from app.stocks.routers import router as stocks_router
+    app.include_router(stocks_router)
+except ImportError:
+    pass  # Stocks deps not installed (e.g. Lambda minimal build)
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,6 +36,11 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+
+
+@app.get("/")
+def root():
+    return {"message": "GenAI API", "docs": "/health", "endpoints": ["/health", "/api/hello", "/api/chat/providers", "/api/chat"]}
 
 
 @app.get("/health")
@@ -96,4 +108,18 @@ def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-lambda_handler = Mangum(app, lifespan="off")
+_mangum = Mangum(app, lifespan="off")
+
+
+def lambda_handler(event, context):
+    """Wrap Mangum to log errors for debugging Lambda 500s."""
+    try:
+        return _mangum(event, context)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {
+            "statusCode": 500,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"detail": str(e), "type": type(e).__name__}),
+        }
