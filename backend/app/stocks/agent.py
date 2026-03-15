@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pandas as pd
 import yfinance as yf
@@ -168,6 +170,69 @@ def _collect_market_news(symbol: str, company_name: str, limit: int = 8) -> list
     return headlines
 
 
+def _fetch_og_image(url: str, timeout: float = 5) -> str | None:
+    """Fetch a URL (following redirects) and extract og:image from meta tags."""
+    if not url or not url.startswith(("http://", "https://")):
+        return None
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; GenAI-2026/1.0; +https://github.com)"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            # Read first 100KB to find og:image (usually in head)
+            chunk = resp.read(100_000)
+    except Exception:
+        return None
+    html = chunk.decode("utf-8", errors="ignore")
+    # Match og:image - property before content or content before property
+    m = re.search(
+        r'property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE,
+    )
+    if not m:
+        m = re.search(
+            r'content=["\']([^"\']+)["\'][^>]*property=["\']og:image["\']',
+            html,
+            re.IGNORECASE,
+        )
+    if m:
+        img_url = m.group(1).strip()
+        if img_url.startswith("//"):
+            img_url = "https:" + img_url
+        elif img_url.startswith("/"):
+            parsed = urllib.parse.urlparse(url)
+            img_url = f"{parsed.scheme}://{parsed.netloc}{img_url}"
+        return img_url if img_url.startswith("http") else None
+    return None
+
+
+def _enrich_headlines_with_images(headlines: list[dict]) -> list[dict]:
+    """Add image_url to each headline by fetching og:image from the article page."""
+    if not headlines:
+        return headlines
+    enriched = [dict(h) for h in headlines]
+
+    def fetch_one(i: int, link: str) -> tuple[int, str | None]:
+        return (i, _fetch_og_image(link))
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futures = {
+            ex.submit(fetch_one, i, h.get("link", "")): i
+            for i, h in enumerate(enriched)
+            if h.get("link")
+        }
+        for fut in as_completed(futures, timeout=15):
+            try:
+                i, img_url = fut.result()
+                if img_url:
+                    enriched[i]["image_url"] = img_url
+            except Exception:
+                pass
+    return enriched
+
+
 def _build_quant_snapshot(df: pd.DataFrame) -> dict:
     latest = df.tail(1)
     if latest.empty:
@@ -243,16 +308,21 @@ def _normalize_mode(mode: str) -> str:
 
 
 def _build_qualitative_prompt(payload: dict, mode: str) -> str:
+    fmt_rules = (
+        "OUTPUT FORMAT (strict): No <hr>, no --- or ***, no numbering (1), 2), etc.). "
+        "Start directly with HighRisk—never write 'Debate' before it.\n\n"
+    )
     normalized_mode = _normalize_mode(mode)
     if normalized_mode == "expert":
         return (
-            "You are a stock strategist writing for advanced users. Use only the provided JSON context.\n\n"
-            "Create a concise debate between 3 risk personas:\n"
+            fmt_rules
+            + "You are a stock strategist writing for advanced users. Use only the provided JSON context.\n\n"
+            "Present 3 perspectives directly:\n"
             "- HighRisk (aggressive growth)\n"
             "- MediumRisk (balanced)\n"
             "- LowRisk (capital preservation)\n\n"
             "Each persona gives 2 specific bullets grounded in BOTH news/macro context and quantitative signals.\n"
-            "Then provide a FINAL QUALITATIVE SUMMARY with:\n"
+            "Then provide FINAL QUALITATIVE SUMMARY with:\n"
             "- News & macro regime\n"
             "- Cross-asset/geopolitics implications\n"
             "- Event risks and catalysts\n"
@@ -262,14 +332,15 @@ def _build_qualitative_prompt(payload: dict, mode: str) -> str:
         )
 
     return (
-        "You are explaining the stock update to someone with zero finance or technical background. Use only the JSON context.\n\n"
+        fmt_rules
+        + "You are explaining the stock update to someone with zero finance or technical background. Use only the JSON context.\n\n"
         "Write in calm, everyday language for a first-time reader.\n"
-        "Create a short debate between 3 voices:\n"
+        "Present 3 perspectives directly:\n"
         "- HighRisk (more comfortable with bigger ups and downs)\n"
         "- MediumRisk (balanced)\n"
         "- LowRisk (more focused on stability)\n\n"
         "Each voice gives exactly 2 short bullet points.\n"
-        "After the debate, write FINAL QUALITATIVE SUMMARY with exactly 3 bullets:\n"
+        "Then write FINAL QUALITATIVE SUMMARY with exactly 3 bullets:\n"
         "- What is happening now\n"
         "- Why this could be risky\n"
         "- What to watch next\n\n"
@@ -286,11 +357,16 @@ def _build_qualitative_prompt(payload: dict, mode: str) -> str:
 
 
 def _build_quantitative_prompt(payload: dict, mode: str) -> str:
+    fmt_rules = (
+        "OUTPUT FORMAT (strict): No <hr>, no --- or ***, no numbering (1), 2), etc.). "
+        "Start directly with HighRisk—never write 'Debate' before it.\n\n"
+    )
     normalized_mode = _normalize_mode(mode)
     if normalized_mode == "expert":
         return (
-            "You are a quantitative stock strategist writing for advanced users. Use only the provided JSON context.\n\n"
-            "Create a concise debate between 3 risk personas:\n"
+            fmt_rules
+            + "You are a quantitative stock strategist writing for advanced users. Use only the provided JSON context.\n\n"
+            "Present 3 perspectives directly:\n"
             "- HighRisk (aggressive growth)\n"
             "- MediumRisk (balanced)\n"
             "- LowRisk (capital preservation)\n\n"
@@ -305,14 +381,15 @@ def _build_quantitative_prompt(payload: dict, mode: str) -> str:
         )
 
     return (
-        "You are explaining the stock numbers to someone with zero finance or technical background. Use only the JSON context.\n\n"
+        fmt_rules
+        + "You are explaining the stock numbers to someone with zero finance or technical background. Use only the JSON context.\n\n"
         "Write in calm, everyday language for a first-time reader.\n"
-        "Create a short debate between 3 voices:\n"
+        "Present 3 perspectives directly:\n"
         "- HighRisk (more comfortable with bigger ups and downs)\n"
         "- MediumRisk (balanced)\n"
         "- LowRisk (more focused on stability)\n\n"
         "Each voice gives exactly 2 short bullet points.\n"
-        "After the debate, write FINAL QUANTITATIVE SUMMARY with exactly 3 bullets:\n"
+        "Then write FINAL QUANTITATIVE SUMMARY with exactly 3 bullets:\n"
         "- Is the stock generally rising or falling lately (plain words)\n"
         "- What the 3-month estimate means (plain words)\n"
         "- Main risk to pay attention to\n\n"

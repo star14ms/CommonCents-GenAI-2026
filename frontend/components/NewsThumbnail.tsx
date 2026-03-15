@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 
 interface NewsThumbnailProps {
   url: string;
+  /** Pre-crawled image URL from backend (og:image). When set, skips Microlink fetch. */
+  imageUrl?: string | null;
   alt?: string;
   width?: number;
   height?: number;
@@ -12,20 +14,26 @@ interface NewsThumbnailProps {
 
 /**
  * Fetches and displays a thumbnail for a news article URL.
- * Uses Microlink API for og:image, falls back to favicon.
+ * Uses pre-crawled image_url when provided, else Microlink API for og:image, falls back to favicon.
  */
 export default function NewsThumbnail({
   url,
+  imageUrl: imageUrlProp,
   alt = "Article thumbnail",
   width = 96,
   height = 64,
   className,
 }: NewsThumbnailProps) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [imageUrl, setImageUrl] = useState<string | null>(imageUrlProp ?? null);
+  const [loading, setLoading] = useState(!imageUrlProp);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    if (imageUrlProp) {
+      setImageUrl(imageUrlProp);
+      setLoading(false);
+      return;
+    }
     if (!url) {
       setLoading(false);
       return;
@@ -36,7 +44,7 @@ export default function NewsThumbnail({
     const fetchThumbnail = async () => {
       try {
         const res = await fetch(
-          `https://api.microlink.io?url=${encodeURIComponent(url)}&screenshot=false&meta=false`
+          `https://api.microlink.io?url=${encodeURIComponent(url)}&screenshot=false`
         );
         if (cancelled) return;
 
@@ -63,7 +71,7 @@ export default function NewsThumbnail({
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [url, imageUrlProp]);
 
   const getFaviconUrl = () => {
     try {

@@ -5,11 +5,26 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import StockChart, { RANGES } from "@/components/StockChart";
-import NewsThumbnail from "@/components/NewsThumbnail";
 import DetailChatbot from "@/components/DetailChatbot";
 import { getCompanyName } from "@/lib/stocks";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+function getStarRatingColor(filledCount: number): string {
+  if (filledCount <= 0) return "#cbd5e1";
+  if (filledCount <= 1) return "#f87171"; // red-400
+  if (filledCount <= 2) return "#fb923c"; // orange-400
+  if (filledCount <= 3) return "#facc15"; // amber-300
+  if (filledCount <= 4) return "#a3e635"; // lime-400
+  return "#4ade80"; // green-400
+}
+
+function formatDateOnly(dateStr: string): string {
+  if (!dateStr?.trim()) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
 
 type HistoryPoint = {
   date: string;
@@ -20,11 +35,12 @@ interface AnalysisData {
   data?: Record<string, unknown>[];
   signal?: string;
   latest_price?: number;
+  score?: number | null;
 }
 
 interface QualitativeSummary {
   qualitative_summary?: string;
-  headlines?: { title?: string; link?: string; published_at?: string }[];
+  headlines?: { title?: string; link?: string; published_at?: string; image_url?: string }[];
 }
 
 interface QuantitativeSummary {
@@ -59,6 +75,7 @@ export default function SearchPage() {
     companyName ? `Company: ${companyName}` : "",
     analysis?.latest_price != null ? `Latest price: $${analysis.latest_price.toFixed(2)}` : "",
     analysis?.signal ? `Analysis signal: ${analysis.signal}` : "",
+    analysis?.score != null ? `Stock rating: ${analysis.score}/10` : "",
     quantitative?.quantitative_summary
       ? `\n## Quantitative Summary\n${quantitative.quantitative_summary}`
       : "",
@@ -66,7 +83,7 @@ export default function SearchPage() {
       ? `\n## Qualitative Summary\n${qualitative.qualitative_summary}`
       : "",
     qualitative?.headlines && qualitative.headlines.length > 0
-      ? `\n## Recent News\n${qualitative.headlines.map((n) => `- ${n.title || "Article"}${n.published_at ? ` (${n.published_at})` : ""}`).join("\n")}`
+      ? `\n## Recent News\n${qualitative.headlines.map((n) => `- ${n.title || "Article"}${n.published_at ? ` (${formatDateOnly(n.published_at)})` : ""}`).join("\n")}`
       : "",
   ]
     .filter(Boolean)
@@ -306,7 +323,7 @@ export default function SearchPage() {
           Summary mode: {mode === "expert" ? "Expert" : "Beginner"}
         </p>
         {analysis?.latest_price != null && (
-          <p style={{ fontSize: "1.25rem", color: "#334155", fontWeight: 600 }}>
+          <p style={{ fontSize: "1.25rem", color: "#334155", fontWeight: 600, margin: 0 }}>
             ${analysis.latest_price.toFixed(2)}
           </p>
         )}
@@ -340,9 +357,10 @@ export default function SearchPage() {
           </div>
         ) : points.length > 0 ? (
           <>
-            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.875rem", color: "#64748b" }}>Price history:</span>
-              {RANGES.map((range) => (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "0.875rem", color: "#64748b" }}>Price history:</span>
+                {RANGES.map((range) => (
                 <button
                   key={range}
                   onClick={() => handleRangeChange(range)}
@@ -359,6 +377,41 @@ export default function SearchPage() {
                   {range}Y
                 </button>
               ))}
+              </div>
+              {analysis?.score != null && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.375rem 0.75rem",
+                    background: "rgba(255,255,255,0.9)",
+                    borderRadius: "999px",
+                    border: "1px solid rgba(0,0,0,0.08)",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                  }}
+                >
+                  <span style={{ fontSize: "1.875rem" }} aria-label={`${analysis.score} out of 10`}>
+                    {[1, 2, 3, 4, 5].map((i) => {
+                      const filledCount = Math.round((analysis!.score! / 10) * 5);
+                      const isFilled = i <= filledCount;
+                      return (
+                        <span
+                          key={i}
+                          style={{
+                            color: isFilled ? getStarRatingColor(filledCount) : "#94a3b8",
+                          }}
+                        >
+                          ★
+                        </span>
+                      );
+                    })}
+                  </span>
+                  <span style={{ fontSize: "0.875rem", color: "#475569", fontWeight: 500 }}>
+                    {analysis.score}/10
+                  </span>
+                </div>
+              )}
             </div>
             <StockChart points={points} years={years} height="20rem" />
           </>
@@ -437,7 +490,7 @@ export default function SearchPage() {
           ) : qualitative?.headlines && qualitative.headlines.length > 0 ? (
             <div style={{ padding: "1rem", background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
               <h2 style={{ fontSize: "1rem", marginBottom: "0.75rem", color: "#334155" }}>Recent news</h2>
-              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {qualitative.headlines.slice(0, 5).map((n, i) => (
                   <li key={i}>
                     {n.link ? (
@@ -447,48 +500,21 @@ export default function SearchPage() {
                         rel="noopener noreferrer"
                         className="link-hover-underline"
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.75rem",
-                          color: "#334155",
+                          display: "block",
+                          color: "var(--color-primary)",
+                          fontSize: "0.875rem",
                           textDecoration: "none",
                         }}
                       >
-                        <NewsThumbnail
-                          url={n.link}
-                          alt={n.title || "Article"}
-                          width={96}
-                          height={64}
-                        />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ color: "var(--color-primary)", fontSize: "0.875rem", fontWeight: 500 }}>
-                            {n.title || "Article"}
+                        {n.title || "Article"}
+                        {n.published_at && (
+                          <span style={{ color: "#94a3b8", fontWeight: 400, marginLeft: "0.25rem" }}>
+                            ({formatDateOnly(n.published_at)})
                           </span>
-                          {n.published_at && (
-                            <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.125rem" }}>
-                              {n.published_at}
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </a>
                     ) : (
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                        <div
-                          style={{
-                            width: 96,
-                            height: 64,
-                            borderRadius: "6px",
-                            background: "#e2e8f0",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                          }}
-                        >
-                          <span style={{ fontSize: "1.5rem", color: "#94a3b8" }}>📰</span>
-                        </div>
-                        <span style={{ fontSize: "0.875rem", color: "#64748b" }}>{n.title || "Article"}</span>
-                      </div>
+                      <span style={{ fontSize: "0.875rem", color: "#64748b" }}>{n.title || "Article"}</span>
                     )}
                   </li>
                 ))}
@@ -509,10 +535,6 @@ export default function SearchPage() {
           animation: search-skeleton-shimmer 1.5s ease-in-out infinite;
         }
         @keyframes search-skeleton-shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-        @keyframes news-thumbnail-shimmer {
           0% { background-position: 200% 0; }
           100% { background-position: -200% 0; }
         }

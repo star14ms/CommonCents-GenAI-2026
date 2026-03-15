@@ -73,7 +73,11 @@ export default function StockChart({ points, years, height = "20rem" }: StockCha
   const plotMin = minVal - yPadding;
   const plotMax = maxVal + yPadding;
   const range = plotMax - plotMin;
+  const firstVal = points[0]?.close ?? 0;
   const lastVal = points[points.length - 1]?.close ?? 0;
+  const isIncreasing = lastVal > firstVal;
+  const isFlat = lastVal === firstVal;
+  const lineColor = isFlat ? "#94a3b8" : isIncreasing ? "#4ade80" : "#f97316"; // gray if flat, light green if up, orange if down
 
   const minIdx = values.indexOf(minVal);
   const maxIdx = values.indexOf(maxVal);
@@ -114,7 +118,7 @@ export default function StockChart({ points, years, height = "20rem" }: StockCha
       >
         <polyline
           fill="none"
-          stroke="#f97316"
+          stroke={lineColor}
           strokeWidth="2"
           points={polyline}
         />

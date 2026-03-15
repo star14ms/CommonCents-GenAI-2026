@@ -192,7 +192,14 @@ def get_stock_analysis(symbol: str, days: int = 30):
         signal = "Oversold - Consider buying"
     else:
         signal = "Neutral"
-    
+
+    # Score 0-10: lower RSI (oversold) = higher score, higher RSI (overbought) = lower score
+    if pd.isna(latest_rsi):
+        score = None
+    else:
+        score = max(0.0, min(10.0, 10.0 - latest_rsi / 10.0))
+        score = round(score, 1)
+
     # Convert DataFrame to dict for JSON response, replacing NaN with None
     import numpy as np
     data = df.tail(5).to_dict(orient='records')
@@ -205,7 +212,8 @@ def get_stock_analysis(symbol: str, days: int = 30):
     return {
         "data": data,
         "signal": signal,
-        "latest_price": df['close'].iloc[-1] if not df.empty else None
+        "latest_price": df['close'].iloc[-1] if not df.empty else None,
+        "score": score,
     }
 
 @router.get("/predict/{symbol}")

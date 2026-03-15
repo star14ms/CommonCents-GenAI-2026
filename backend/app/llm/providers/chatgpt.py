@@ -131,12 +131,51 @@ class ChatGPTProvider:
         return ""
 
     def chat_stream(self, messages: list[ChatMessage], tools: list[str] | None = None):
-        """Stream chat response token by token. Yields text chunks."""
-        text = self.chat(messages, tools=tools)
-        if not text:
-            return
+        """Stream chat response token by token. Yields text chunks from the API stream."""
+        from openai import OpenAI
 
-        chunk_size = 120
-        for i in range(0, len(text), chunk_size):
-            yield text[i : i + chunk_size]
+        load_dotenv()
+        api_key = (
+            os.environ.get("OPENAI_API_KEY")
+            or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+            or os.environ.get("HF_TOKEN")
+        )
+        base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+        if str(api_key).startswith("http://") or str(api_key).startswith("https://"):
+            raise ValueError(
+                "OPENAI_API_KEY is set to a URL. Put the endpoint URL in OPENAI_BASE_URL and put the real API token in OPENAI_API_KEY."
+            )
+
+        formatted = [{"role": msg.role, "content": msg.content} for msg in messages]
+        create_kwargs: dict = {
+            "model": self.model,
+            "messages": formatted,
+            "stream": True,
+        }
+        if tools:
+            from ..tools import AVAILABLE_TOOLS
+            tool_configs = []
+            for t in AVAILABLE_TOOLS:
+                if t["id"] not in tools:
+                    continue
+                cfg = t.get("config")
+                if cfg is None and "config_factory" in t:
+                    cfg = t["config_factory"]()
+                if not cfg or not isinstance(cfg, dict):
+                    continue
+                if cfg.get("type") == "file_search" and not cfg.get("vector_store_ids"):
+                    continue
+                tool_configs.append(cfg)
+            if tool_configs:
+                create_kwargs["tools"] = tool_configs
+
+        client = OpenAI(api_key=api_key, base_url=base_url.rstrip("/"))
+        stream = client.chat.completions.create(**create_kwargs)
+        for chunk in stream:
+            if chunk.choices and len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                if delta and delta.content:
+                    yield delta.content
 

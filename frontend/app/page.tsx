@@ -148,7 +148,6 @@ export default function Home() {
                   e.currentTarget.style.borderColor = "#e2e8f0";
                   e.currentTarget.style.boxShadow = "none";
                 }}
-                onFocus={() => query.trim().length > 0 && suggestions.length > 0 && setShowDropdown(true)}
               />
               {showDropdown && suggestions.length > 0 && (
                 <ul
