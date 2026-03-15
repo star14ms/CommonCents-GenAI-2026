@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import StockChart, { RANGES } from "@/components/StockChart";
+import NewsThumbnail from "@/components/NewsThumbnail";
+import DetailChatbot from "@/components/DetailChatbot";
 import { getCompanyName } from "@/lib/stocks";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -50,6 +52,25 @@ export default function SearchPage() {
   const base = API_URL.replace(/\/$/, "");
   const points = pointsByRange[years] ?? [];
   const companyName = getCompanyName(symbol);
+  const searchResultRef = useRef<HTMLDivElement>(null);
+
+  const fullPageContext = [
+    `Symbol: ${symbol}`,
+    companyName ? `Company: ${companyName}` : "",
+    analysis?.latest_price != null ? `Latest price: $${analysis.latest_price.toFixed(2)}` : "",
+    analysis?.signal ? `Analysis signal: ${analysis.signal}` : "",
+    quantitative?.quantitative_summary
+      ? `\n## Quantitative Summary\n${quantitative.quantitative_summary}`
+      : "",
+    qualitative?.qualitative_summary
+      ? `\n## Qualitative Summary\n${qualitative.qualitative_summary}`
+      : "",
+    qualitative?.headlines && qualitative.headlines.length > 0
+      ? `\n## Recent News\n${qualitative.headlines.map((n) => `- ${n.title || "Article"}${n.published_at ? ` (${n.published_at})` : ""}`).join("\n")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   useEffect(() => {
     if (!symbol || !base || base === "undefined") {
@@ -287,24 +308,6 @@ export default function SearchPage() {
         {analysis?.latest_price != null && (
           <p style={{ fontSize: "1.25rem", color: "#334155", fontWeight: 600 }}>
             ${analysis.latest_price.toFixed(2)}
-            {analysis.signal && (
-              <span
-                title="Based on RSI: below 30 = Oversold, above 70 = Overbought, 30-70 = Neutral"
-                style={{
-                  marginLeft: "0.75rem",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color:
-                    analysis.signal.includes("Oversold")
-                      ? "#059669"
-                      : analysis.signal.includes("Overbought")
-                        ? "#dc2626"
-                        : "#64748b",
-                }}
-              >
-                ({analysis.signal})
-              </span>
-            )}
           </p>
         )}
       </header>
@@ -367,7 +370,7 @@ export default function SearchPage() {
       </section>
 
       {/* Section 2: Quantitative + Qualitative - side by side, 50% width each */}
-      <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      <section ref={searchResultRef} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         <div style={{ display: "flex", flexDirection: "row", gap: "1.5rem", flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column" }}>
             {loadingQuantitative ? (
@@ -433,16 +436,59 @@ export default function SearchPage() {
             </div>
           ) : qualitative?.headlines && qualitative.headlines.length > 0 ? (
             <div style={{ padding: "1rem", background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-              <h2 style={{ fontSize: "1rem", marginBottom: "0.5rem", color: "#334155" }}>Recent news</h2>
-              <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.875rem" }}>
+              <h2 style={{ fontSize: "1rem", marginBottom: "0.75rem", color: "#334155" }}>Recent news</h2>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {qualitative.headlines.slice(0, 5).map((n, i) => (
-                  <li key={i} style={{ marginBottom: "0.25rem" }}>
+                  <li key={i}>
                     {n.link ? (
-                      <a href={n.link} target="_blank" rel="noopener noreferrer" className="link-hover-underline" style={{ color: "#2563eb" }}>
-                        {n.title || "Article"}
+                      <a
+                        href={n.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="link-hover-underline"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.75rem",
+                          color: "#334155",
+                          textDecoration: "none",
+                        }}
+                      >
+                        <NewsThumbnail
+                          url={n.link}
+                          alt={n.title || "Article"}
+                          width={96}
+                          height={64}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ color: "#2563eb", fontSize: "0.875rem", fontWeight: 500 }}>
+                            {n.title || "Article"}
+                          </span>
+                          {n.published_at && (
+                            <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.125rem" }}>
+                              {n.published_at}
+                            </div>
+                          )}
+                        </div>
                       </a>
                     ) : (
-                      n.title || "Article"
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <div
+                          style={{
+                            width: 96,
+                            height: 64,
+                            borderRadius: "6px",
+                            background: "#e2e8f0",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span style={{ fontSize: "1.5rem", color: "#94a3b8" }}>📰</span>
+                        </div>
+                        <span style={{ fontSize: "0.875rem", color: "#64748b" }}>{n.title || "Article"}</span>
+                      </div>
                     )}
                   </li>
                 ))}
@@ -466,7 +512,18 @@ export default function SearchPage() {
           0% { background-position: 200% 0; }
           100% { background-position: -200% 0; }
         }
+        @keyframes news-thumbnail-shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
       `}</style>
+
+      <DetailChatbot
+        symbol={symbol}
+        companyName={companyName || symbol}
+        fullPageContext={fullPageContext}
+        selectableRef={searchResultRef}
+      />
     </main>
   );
 }
