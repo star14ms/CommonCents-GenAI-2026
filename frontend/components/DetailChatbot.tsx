@@ -201,6 +201,18 @@ export default function DetailChatbot({ symbol, companyName, fullPageContext, se
 
   return (
     <>
+      <style>{`
+        @keyframes detail-chatbox-appear {
+          from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close chatbot" : "Open chatbot"}
@@ -270,6 +282,7 @@ export default function DetailChatbot({ symbol, companyName, fullPageContext, se
             flexDirection: "column",
             zIndex: 9999,
             overflow: "hidden",
+            animation: "detail-chatbox-appear 0.25s ease-out forwards",
           }}
         >
           <div

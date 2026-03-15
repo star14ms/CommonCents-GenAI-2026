@@ -7,6 +7,8 @@ import ReactMarkdown from "react-markdown";
 import StockChart, { RANGES } from "@/components/StockChart";
 import DetailChatbot from "@/components/DetailChatbot";
 import { getCompanyName } from "@/lib/stocks";
+import { useAuth } from "@/contexts/AuthContext";
+import { saveSearchHistory } from "@/lib/searchHistory";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -53,6 +55,7 @@ type PointsByRange = Partial<Record<(typeof RANGES)[number], HistoryPoint[]>>;
 export default function SearchPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const symbol = (params?.symbol as string)?.toUpperCase() || "";
   const mode = (searchParams?.get("mode") || "beginner").toLowerCase() === "expert" ? "expert" : "beginner";
   const [years, setYears] = useState<(typeof RANGES)[number]>(1);
@@ -63,6 +66,8 @@ export default function SearchPage() {
   const [loadingChart, setLoadingChart] = useState(true);
   const [loadingQualitative, setLoadingQualitative] = useState(true);
   const [loadingQuantitative, setLoadingQuantitative] = useState(true);
+  const [qualStreamComplete, setQualStreamComplete] = useState(false);
+  const [quantStreamComplete, setQuantStreamComplete] = useState(false);
   const [loadingRating, setLoadingRating] = useState(false);
   const [rating, setRating] = useState<{ score: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +108,8 @@ export default function SearchPage() {
     setLoadingChart(true);
     setLoadingQualitative(true);
     setLoadingQuantitative(true);
+    setQualStreamComplete(false);
+    setQuantStreamComplete(false);
     setRating(null);
     setError(null);
 
@@ -168,6 +175,7 @@ export default function SearchPage() {
         if (!res.ok || !res.body) {
           setQualitative(null);
           setLoadingQualitative(false);
+          setQualStreamComplete(true);
           sync.qualReady = true;
           releaseBoth();
           return;
@@ -182,7 +190,10 @@ export default function SearchPage() {
         while (true) {
           const { done, value } = await reader.read();
           if (qualCancelled) return;
-          if (done) break;
+          if (done) {
+            setQualStreamComplete(true);
+            break;
+          }
           buffer += decoder.decode(value, { stream: true });
 
           if (!metaParsed && buffer.includes("\n")) {
@@ -223,6 +234,7 @@ export default function SearchPage() {
       } catch (e) {
         if ((e as Error).name === "AbortError" || qualCancelled) return;
         setQualitative(null);
+        setQualStreamComplete(true);
         sync.qualReady = true;
         releaseBoth();
       } finally {
@@ -240,6 +252,7 @@ export default function SearchPage() {
         if (!res.ok || !res.body) {
           setQuantitative(null);
           setLoadingQuantitative(false);
+          setQuantStreamComplete(true);
           sync.quantReady = true;
           releaseBoth();
           return;
@@ -251,7 +264,10 @@ export default function SearchPage() {
         while (true) {
           const { done, value } = await reader.read();
           if (quantCancelled) return;
-          if (done) break;
+          if (done) {
+            setQuantStreamComplete(true);
+            break;
+          }
           summary += decoder.decode(value, { stream: true });
           if (!sync.quantReady) {
             sync.quantReady = true;
@@ -265,6 +281,7 @@ export default function SearchPage() {
       } catch (e) {
         if ((e as Error).name === "AbortError" || quantCancelled) return;
         setQuantitative(null);
+        setQuantStreamComplete(true);
         sync.quantReady = true;
         releaseBoth();
       } finally {
@@ -335,6 +352,48 @@ export default function SearchPage() {
     qualitative?.headlines,
     quantitative?.quantitative_summary,
     analysis?.latest_price,
+  ]);
+
+  // Save search history for signed-in users when streams and rating are complete
+  const savedToHistoryRef = useRef(false);
+  useEffect(() => {
+    if (
+      !user?.id ||
+      savedToHistoryRef.current ||
+      loadingChart ||
+      !qualStreamComplete ||
+      !quantStreamComplete ||
+      loadingRating
+    )
+      return;
+    const hasData =
+      Object.keys(pointsByRange).length > 0 ||
+      qualitative?.qualitative_summary ||
+      quantitative?.quantitative_summary;
+    if (!hasData) return;
+
+    savedToHistoryRef.current = true;
+    saveSearchHistory(user.id, symbol, mode, companyName || null, {
+      pointsByRange: pointsByRange as Record<number, { date: string; close: number | null }[]>,
+      analysis,
+      qualitative,
+      quantitative,
+      rating,
+    }).catch(() => {});
+  }, [
+    user?.id,
+    symbol,
+    mode,
+    companyName,
+    loadingChart,
+    qualStreamComplete,
+    quantStreamComplete,
+    loadingRating,
+    pointsByRange,
+    analysis,
+    qualitative,
+    quantitative,
+    rating,
   ]);
 
   const handleRangeChange = (range: (typeof RANGES)[number]) => {

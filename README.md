@@ -161,6 +161,8 @@ For local development, create `.env` at project root (see `frontend/.env.example
 
 ## Supabase Setup
 
+### Required tables
+
 Create the `items` table in Supabase (SQL Editor):
 
 ```sql
@@ -176,3 +178,5 @@ create policy "Allow all" on items for all using (true) with check (true);
 ```
 
 Then add rows via Table Editor or API.
+
+**Search history (signed-in users):** Run `supabase/migrations/20250317000000_create_search_history.sql` in the Supabase SQL Editor to enable saving and viewing search history for authenticated users.

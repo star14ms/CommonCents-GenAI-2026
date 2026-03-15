@@ -312,11 +312,11 @@ export default function TestChatPage() {
           onClick={() => signInWithGoogle()}
           style={{
             padding: "0.5rem 1rem",
-            fontSize: "0.875rem",
+            fontSize: "1rem",
             borderRadius: "6px",
             border: "none",
-            background: "#4285f4",
-            color: "white",
+            background: "transparent",
+            color: "#334155",
             cursor: "pointer",
           }}
         >
