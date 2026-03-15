@@ -116,15 +116,16 @@ export default function HistoryViewPage() {
   const rating = rd?.rating ?? null;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#ffedd5", width: "100%" }}>
-      <main
-        style={{
-          maxWidth: "64rem",
-          margin: "0 auto",
-          padding: "1.5rem",
-          paddingBottom: "3rem",
-        }}
-      >
+    <main
+      style={{
+        background: "#ffedd5",
+        width: "100%",
+        margin: 0,
+        padding: "1.5rem 1.5rem 3rem",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ maxWidth: "64rem", margin: "0 auto" }}>
         <header style={{ marginBottom: "1.5rem" }}>
           <Link
             href="/"
@@ -411,7 +412,7 @@ export default function HistoryViewPage() {
             View latest data →
           </Link>
         </p>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }

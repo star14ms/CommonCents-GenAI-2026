@@ -49,7 +49,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
       style={{
         display: "flex",
         flexDirection: "row",
-        minHeight: "100vh",
+        alignItems: "flex-start",
         width: "100%",
         background: "linear-gradient(180deg, #ffedd5 0%, rgb(255, 200, 142) 50%, #e2e8f0 100%)",
       }}
@@ -61,6 +61,8 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
             width: sidebarOpen ? "16rem" : "0",
             minWidth: sidebarOpen ? "16rem" : "0",
             flexShrink: 0,
+            minHeight: "100vh",
+            maxHeight: "100vh",
             display: "flex",
             flexDirection: "column",
             borderRight: sidebarOpen ? "1px solid rgba(0,0,0,0.08)" : "none",
@@ -253,10 +255,12 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
         >
           <div
             style={{
-              pointerEvents: "auto",
+              width: user ? "2.75rem" : 0,
+              height: "2.75rem",
+              flexShrink: 0,
+              pointerEvents: user && !sidebarOpen ? "auto" : "none",
               opacity: user && !sidebarOpen ? 1 : 0,
-              visibility: user && !sidebarOpen ? "visible" : "hidden",
-              transition: "opacity 0.2s ease-out, visibility 0.2s ease-out",
+              transition: "opacity 0.2s ease-out, width 0.2s ease-out",
             }}
           >
             {user && !sidebarOpen && (

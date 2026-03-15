@@ -467,15 +467,17 @@ export default function SearchPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#ffedd5", width: "100%" }}>
-      <main
-        style={{
-          maxWidth: "64rem",
-          margin: "0 auto",
-          padding: "1.5rem",
-          paddingBottom: "3rem",
-        }}
-      >
+    <main
+      style={{
+        background: "#ffedd5",
+        width: "100%",
+        minHeight: "100vh",
+        margin: 0,
+        padding: "1.5rem 1.5rem 3rem",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ maxWidth: "64rem", margin: "0 auto" }}>
       <header style={{ marginBottom: "1.5rem" }}>
         <Link
           href="/"
@@ -546,11 +548,26 @@ export default function SearchPage() {
       <section style={{ marginBottom: "2rem", minHeight: "22rem" }}>
         {loadingChart ? (
           <div className="search-detail-skeleton" style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-              <div className="skeleton-block" style={{ width: "6rem", height: "1.25rem", borderRadius: "4px" }} />
-              {RANGES.map((r) => (
-                <div key={r} className="skeleton-block" style={{ width: "2.5rem", height: "1.75rem", borderRadius: "8px" }} />
-              ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                <div className="skeleton-block" style={{ width: "6rem", height: "1.25rem", borderRadius: "4px" }} />
+                {RANGES.map((r) => (
+                  <div key={r} className="skeleton-block" style={{ width: "2.5rem", height: "1.75rem", borderRadius: "8px" }} />
+                ))}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0.375rem 0.75rem",
+                  background: "rgba(255,255,255,0.9)",
+                  borderRadius: "999px",
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                }}
+              >
+                <span style={{ fontSize: "0.875rem", color: "#64748b" }}>Rating…</span>
+              </div>
             </div>
             <div className="skeleton-block" style={{ height: "20rem", borderRadius: "12px" }} />
           </div>
@@ -577,7 +594,7 @@ export default function SearchPage() {
                 </button>
               ))}
               </div>
-              {(loadingRating || rating?.score != null) && (
+              {(loadingRating || loadingQualitative || loadingQuantitative || rating?.score != null) && (
                 <div
                   style={{
                     display: "flex",
@@ -590,7 +607,7 @@ export default function SearchPage() {
                     boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                   }}
                 >
-                  {loadingRating ? (
+                  {loadingRating || loadingQualitative || loadingQuantitative ? (
                     <span style={{ fontSize: "0.875rem", color: "#64748b" }}>Rating…</span>
                   ) : rating?.score != null ? (
                     <>
@@ -753,7 +770,7 @@ export default function SearchPage() {
       />
       </>
       )}
+      </div>
     </main>
-    </div>
   );
 }

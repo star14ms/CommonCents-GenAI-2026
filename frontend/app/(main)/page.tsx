@@ -82,7 +82,7 @@ export default function Home() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "2rem",
+          padding: "2rem 2rem 3rem",
           minWidth: 0,
         }}
       >
